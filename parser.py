@@ -253,16 +253,20 @@ class DataParser:
             国家数据列表
         """
         countries = {}
-        
+        handle_countries = {}
+
         for city in cities_data:
             country_name = city.get('city_country')
             if country_name and country_name.strip():
                 if country_name not in countries:
+                    country_territory = city.get('city_country_territory', [])
+                    if "..." in country_territory:
+                        handle_countries[country_name] = []
                     countries[country_name] = {
                         'country_name': country_name,
                         'country_level': city.get('city_country_level', ''),
                         'country_capital': city.get('city_country_capital', ''),
-                        'country_territory': city.get('city_country_territory', []),
+                        'country_territory': country_territory,
                         'territory_count': 0,
                         'player_count': 0,
                         'total_blocks': 0
@@ -281,7 +285,13 @@ class DataParser:
                         if territory_city.get('city_country') == country_name:
                             existing_players.update(territory_city.get('city_players', []))
                     country_data['player_count'] = len(existing_players)
-        
+        # 对于网页地图显示不详细的国家所包含的城市信息，再次循环补上
+        for city in cities_data:
+            country_name = city.get('city_country') 
+            if country_name in handle_countries:
+                handle_countries[country_name].append(city.get('city_name'))
+        for country_name, cities in handle_countries.items():
+            countries[country_name]['country_territory'] = cities
         return list(countries.values())
 
 
