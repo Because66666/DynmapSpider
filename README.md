@@ -206,6 +206,6 @@ python main.py export cities
 - BeautifulSoup4 HTML解析
 - 模块化设计，功能解耦
 
-## 许可证
+## 许可证：Apache-2.0 license
 
 本项目仅供学习和研究使用，请遵守相关服务器的使用条款。
