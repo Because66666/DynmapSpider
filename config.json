@@ -1,0 +1,9 @@
+{
+  "db_path": "simmc_data.db",
+  "timeout": 30,
+  "retry_count": 3,
+  "retry_delay": 5,
+  "interval_minutes": 60,
+  "player_api_url": "https://map.simmc.cn/standalone/dynmap_world.json",
+  "city_api_url": "https://map.simmc.cn/tiles/_markers_/marker_world.json"
+}
