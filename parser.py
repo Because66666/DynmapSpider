@@ -86,7 +86,7 @@ class DataParser:
                         continue
                     
                     city_data = {
-                        'label': city_info['label'],
+                        'label': city_id, # 确保唯一性。适应城市改名的情况
                         'x': x,
                         'y': y,
                         'z': z,

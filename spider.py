@@ -194,6 +194,20 @@ class SIMMCSpider:
                     player_success_count += 1
             print(f"成功存储 {player_success_count}/{len(players)} 个玩家数据")
             
+            # 查找在数据库中但不在当前数据中的城市
+            print("正在查找消失的城市...")
+            missing_cities:list = self.find_missing_cities(cities)
+            if missing_cities:
+                message = f"发现 {len(missing_cities)} 个城市在地图中消失"
+                print(message)
+                report_information(message)
+                city_ids = [city['label'] for city in missing_cities]
+                self._print_city_info(city_ids)
+                # 打印完成后删除对应的数据
+                self.city_model.delete_cities(city_ids)
+            else:
+                print("没有发现消失的城市")
+            
             # 存储城市数据
             print("正在存储城市数据...")
             city_success_count = 0
@@ -270,7 +284,42 @@ class SIMMCSpider:
                 
         except Exception as e:
             print(f"检查非活跃玩家时出错: {e}")
-    
+            
+    def _print_city_info(self, city_id_list:list[str]):
+        """
+        打印城市详细信息
+        
+        Args:
+            city_id_list: 城市ID列表
+        """
+        city_info = "城市信息：\n"+"-"*60
+        try:
+            placeholders = ','.join(['?' for _ in city_id_list])
+            cities = self.db_manager.execute_query(
+                f"SELECT * FROM cities WHERE label IN ({placeholders})",
+                city_id_list
+            )
+                       
+            if cities:
+                for city in cities:
+                    level = city['city_level']
+                    city_info += f"""
+所在{level}: {city['city_name']}
+ {level}所有者: {city['city_owner']}
+ {level}区块大小: {city['city_block']}
+ {level}坐标(x,y,z)：({city['x']}, {city['y']}, {city['z']})
+ {level}财政({city['city_balance']})\n"""
+                    city_info+="\n"
+                print(city_info)
+                report_information(city_info)
+
+            else:
+                print(f'数据错误：城市label {city_id_list} 不存在')
+                            
+        except Exception as e:
+            print(f"打印城市信息时出错: {e}")
+
+
     def _print_player_info(self, player, current_time: int):
         """
         打印玩家详细信息
@@ -429,6 +478,24 @@ class SIMMCSpider:
             
         except Exception as e:
             print(f"清理旧数据时出错: {e}")
+    
+    def find_missing_cities(self, current_city_data: List[Dict[str, Any]]) -> List:
+        """
+        找出在数据库中但不在当前city_data中的城市
+        
+        Args:
+            current_city_data: 当前的城市数据列表
+            
+        Returns:
+            缺失的城市数据列表
+        """
+        try:
+            missing_cities = self.city_model.get_cities_not_in_data(current_city_data)          
+            return missing_cities
+            
+        except Exception as e:
+            print(f"查找缺失城市时出错: {e}")
+            return []
 
 
 class SpiderConfig:

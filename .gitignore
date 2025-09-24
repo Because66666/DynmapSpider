@@ -2,3 +2,4 @@
 test/
 cache.txt
 __pycache__/
+.idea/

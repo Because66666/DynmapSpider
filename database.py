@@ -299,8 +299,8 @@ class CityModel:
             
             # 检查城市是否已存在
             existing = self.db.execute_query(
-                "SELECT id FROM cities WHERE city_name = ?",
-                (city_data['city_name'],)
+                "SELECT id FROM cities WHERE label = ?",
+                (city_data['label'],)
             )
             
             # 将玩家列表转换为JSON字符串
@@ -310,31 +310,53 @@ class CityModel:
                 # 更新现有城市数据
                 query = '''
                     UPDATE cities SET 
-                    label = ?, x = ?, y = ?, z = ?, city_level = ?, city_owner = ?,
+                    city_name = ?, x = ?, y = ?, z = ?, city_level = ?, city_owner = ?,
                     city_balance = ?, city_block = ?, city_players = ?, city_country = ?, update_time = ?
-                    WHERE city_name = ?
+                    WHERE label = ?
                 '''
                 params = (
-                    city_data['label'], city_data['x'], city_data['y'], city_data['z'],
+                    city_data['city_name'], city_data['x'], city_data['y'], city_data['z'],
                     city_data.get('city_level'), city_data.get('city_owner'),
                     city_data.get('city_balance'), city_data.get('city_block'),
                     city_players_json, city_data.get('city_country'), update_time,
-                    city_data['city_name']
+                    city_data['label']
                 )
             else:
-                # 插入新城市数据
-                query = '''
-                    INSERT INTO cities 
-                    (city_name, label, x, y, z, city_level, city_owner, city_balance, 
-                     city_block, city_players, city_country, update_time)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                '''
-                params = (
-                    city_data['city_name'], city_data['label'], city_data['x'], city_data['y'],
-                    city_data['z'], city_data.get('city_level'), city_data.get('city_owner'),
-                    city_data.get('city_balance'), city_data.get('city_block'),
-                    city_players_json, city_data.get('city_country'), update_time
+                # 为确保数据兼容性，检查城市名是否存在
+                city_name_existing = self.db.execute_query(
+                    "SELECT id FROM cities WHERE city_name = ?",
+                    (city_data['city_name'],)
                 )
+                if city_name_existing:
+                    # 城市名已存在，更新城市数据
+                    query = '''
+                        UPDATE cities SET 
+                        label = ?, x = ?, y = ?, z = ?, city_level = ?, city_owner = ?,
+                        city_balance = ?, city_block = ?, city_players = ?, city_country = ?, update_time = ?
+                        WHERE city_name = ?
+                    '''
+                    params = (
+                        city_data['label'], city_data['x'], city_data['y'], city_data['z'],
+                        city_data.get('city_level'), city_data.get('city_owner'),
+                        city_data.get('city_balance'), city_data.get('city_block'),
+                        city_players_json, city_data.get('city_country'), update_time,
+                        city_data['city_name']
+                    )
+                else:
+                    # 插入新城市数据
+                    query = '''
+                        INSERT INTO cities 
+                        (city_name, label, x, y, z, city_level, city_owner, city_balance, 
+                        city_block, city_players, city_country, update_time)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    '''
+                    params = (
+                        city_data['city_name'], city_data['label'], city_data['x'], city_data['y'],
+                        city_data['z'], city_data.get('city_level'), city_data.get('city_owner'),
+                        city_data.get('city_balance'), city_data.get('city_block'),
+                        city_players_json, city_data.get('city_country'), update_time
+                    )
+
             
             self.db.execute_update(query, params)
             return True
@@ -350,12 +372,70 @@ class CityModel:
         )
         return result[0] if result else None
     
+    def get_cities_not_in_data(self, current_city_data: List[Dict[str, Any]]) -> List[sqlite3.Row]:
+        """
+        筛选出在数据表中存在但不在当前city_data中的城市数据
+        
+        Args:
+            current_city_data: 当前的城市数据列表
+            
+        Returns:
+            在数据库中但不在当前数据中的城市列表
+        """
+        try:
+            # 获取当前数据中的所有城市名称
+            current_city_ids = [city.get('label', '') for city in current_city_data if city.get('label')]
+            
+            if not current_city_ids:
+                # 如果当前数据为空，返回数据库中所有城市
+                return self.db.execute_query("SELECT * FROM cities")
+            
+            # 构建查询条件，使用参数化查询防止SQL注入
+            placeholders = ','.join(['?' for _ in current_city_ids])
+            query = f"SELECT * FROM cities WHERE label NOT IN ({placeholders})"
+            
+            result = self.db.execute_query(query, current_city_ids)
+
+            # 检查完之后，删除数据库中不存在的城市数据
+            # if result:
+            #     if not self._delete_cities(result):
+            #         print(f"删除数据库中已经消失的城市数据失败: {str(result['city_name'])}")
+
+            return result if result else []
+            
+        except Exception as e:
+            print(f"筛选城市数据失败: {e}")
+            return []
+    
     def get_top_cities_by_blocks(self, limit: int = 5) -> List[sqlite3.Row]:
         """获取区块面积排行前N的城市"""
         return self.db.execute_query(
             "SELECT * FROM cities ORDER BY city_block DESC LIMIT ?",
             (limit,)
         )
+    
+    def delete_cities(self,city_ids:list[str]) -> bool:
+        """
+        删除数据库中不存在的城市数据
+        
+        Args:
+            city_ids: 城市ID列表
+            
+        Returns:
+            操作是否成功
+        """
+        try:
+            if not city_ids:
+                return True
+                
+            placeholders = ','.join(['?' for _ in city_ids])
+            query = f"DELETE FROM cities WHERE label IN ({placeholders})"
+            self.db.execute_update(query, city_ids)
+            return True
+            
+        except Exception as e:
+            print(f"删除城市数据失败: {e}")
+            return False
 
 
 class CountryModel:
